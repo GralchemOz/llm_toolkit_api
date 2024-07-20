@@ -1,0 +1,7 @@
+fastapi==0.111.1
+httpx==0.27.0
+Pillow==10.4.0
+Requests==2.32.3
+torch
+transformers>=4.42.0
+uvicorn==0.30.3
