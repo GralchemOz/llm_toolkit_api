@@ -17,6 +17,7 @@ parser.add_argument('--host', type=str, default='127.0.0.1', help='Host to run t
 parser.add_argument('--model_path', type=str, default='microsoft/Florence-2-large-ft', help='Path to the model')
 parser.add_argument('--trust_remote_code', type=bool, default=True, help='Whether to trust remote code')
 parser.add_argument('--dtype', type=str, default='float16', help='Data type to use for the model')
+parser.add_argument('--device', type=str, default='cuda', help='Device to use for the model')
 args = parser.parse_args()
 
 if args.dtype == 'float16':
@@ -31,7 +32,7 @@ else:
 
 # 初始化模型和处理器
 processor = AutoProcessor.from_pretrained(args.model_path ,trust_remote_code=True)
-model = AutoModelForCausalLM.from_pretrained(args.model_path, torch_dtype=torch_dtype ,trust_remote_code=args.trust_remote_code).to('cuda')
+model = AutoModelForCausalLM.from_pretrained(args.model_path, torch_dtype=torch_dtype ,trust_remote_code=args.trust_remote_code).to(args.device)
 
 @app.post("/generate/")
 async def generate(body: dict = Body(...)):
@@ -55,7 +56,7 @@ async def generate(body: dict = Body(...)):
     if image.mode != 'RGB':
         image = image.convert('RGB')
     # 处理输入
-    inputs = processor(text=prompt, images=image, return_tensors="pt").to('cuda',torch_dtype)
+    inputs = processor(text=prompt, images=image, return_tensors="pt").to(args.device,torch_dtype)
 
 
     generated_ids = model.generate(
