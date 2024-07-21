@@ -6,8 +6,8 @@ import requests
 import torch
 import httpx
 import base64
-app = FastAPI()
 import argparse
+
 # 解析命令行参数
 parser = argparse.ArgumentParser()
 parser.add_argument('--port', type=int, default=8000, help='Port to run the server on')
@@ -29,13 +29,22 @@ elif args.dtype == 'bfloat16':
 else:
     raise ValueError(f"Unsupported data type: {args.dtype}")
 # 初始化FastAPI应用
-
+app = FastAPI(    title="llm_toolkit_api",
+    description="A simple API for extra functionality for large language models",
+    version="0.2.0")
 # 初始化模型和处理器
 processor = AutoProcessor.from_pretrained(args.model_path ,trust_remote_code=True)
 model = AutoModelForCausalLM.from_pretrained(args.model_path, torch_dtype=torch_dtype ,trust_remote_code=args.trust_remote_code).to(args.device)
 
 @app.post("/generate/")
-async def generate(body: dict = Body(...)):
+async def generate(body: dict = Body(...,example={
+    "prompt": "<CAPTION>",
+    "task_type": "<CAPTION>",
+    "file_or_url": "https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/transformers/tasks/car.jpg?download=true"
+})):
+    """
+    Send a image into the florence-2 model and get the replay
+    """
     prompt = body.get("prompt", None)
     task_type = body.get("task_type", None)
     file_or_url = body.get("file_or_url", None)
@@ -52,7 +61,17 @@ async def generate(body: dict = Body(...)):
     except:
         url = file_or_url
         #image = Image.open(requests.get(url, stream=True).raw)
-        image = Image.open(httpx.get(url))
+        # 发送HTTP GET请求以获取图片
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url1, follow_redirects=True)
+            response.raise_for_status()  # 确保请求成功
+
+            # 将响应内容（即图片数据）存储在变量中
+            image_data = response.content
+
+        # 使用Pillow打开图片
+        image = Image.open(io.BytesIO(image_data))        
+        
     if image.mode != 'RGB':
         image = image.convert('RGB')
     # 处理输入
