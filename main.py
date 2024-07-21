@@ -63,7 +63,7 @@ async def generate(body: dict = Body(...,example={
         #image = Image.open(requests.get(url, stream=True).raw)
         # 发送HTTP GET请求以获取图片
         async with httpx.AsyncClient() as client:
-            response = await client.get(url1, follow_redirects=True)
+            response = await client.get(url, follow_redirects=True)
             response.raise_for_status()  # 确保请求成功
 
             # 将响应内容（即图片数据）存储在变量中
@@ -71,7 +71,7 @@ async def generate(body: dict = Body(...,example={
 
         # 使用Pillow打开图片
         image = Image.open(io.BytesIO(image_data))        
-        
+
     if image.mode != 'RGB':
         image = image.convert('RGB')
     # 处理输入
