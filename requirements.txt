@@ -4,4 +4,5 @@ Pillow==10.4.0
 Requests==2.32.3
 torch
 transformers>=4.42.0
+einops
 uvicorn==0.30.3
