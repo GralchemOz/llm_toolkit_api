@@ -51,7 +51,7 @@ except ImportError:
     with patch("transformers.dynamic_module_utils.get_imports", fixed_get_imports):
         model = AutoModelForCausalLM.from_pretrained("microsoft/Florence-2-base-ft", trust_remote_code=True)
         processor = AutoProcessor.from_pretrained("microsoft/Florence-2-base-ft", trust_remote_code=True)
-        model.to(device)    
+        model.to(args.device)    
 
 @app.post("/generate/")
 async def generate(body: dict = Body(...,example={
