@@ -9,6 +9,7 @@ import base64
 import argparse
 from unittest.mock import patch
 from transformers.dynamic_module_utils import get_imports
+import os
 
 # 解析命令行参数
 parser = argparse.ArgumentParser()
