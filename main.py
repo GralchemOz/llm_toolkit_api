@@ -49,8 +49,8 @@ except ImportError:
         return imports
 
     with patch("transformers.dynamic_module_utils.get_imports", fixed_get_imports):
-        model = AutoModelForCausalLM.from_pretrained(args.model_path, trust_remote_code=True)
-        processor = AutoProcessor.from_pretrained(args.model_path, trust_remote_code=True)
+        model = AutoModelForCausalLM.from_pretrained(args.model_path, torch_dtype=torch_dtype ,trust_remote_code=args.trust_remote_code)
+        processor = AutoProcessor.from_pretrained(args.model_path, trust_remote_code=args.trust_remote_code)
         model.to(args.device)    
 
 @app.post("/generate/")
