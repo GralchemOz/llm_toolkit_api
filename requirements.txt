@@ -6,4 +6,5 @@ torch>=2.1.0
 transformers>=4.42.0
 einops==0.7.0
 timm==0.9.16
+sentence_transformers == 2.2.2
 uvicorn==0.30.3

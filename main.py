@@ -21,6 +21,7 @@ parser.add_argument('--model_path', type=str, default='microsoft/Florence-2-larg
 parser.add_argument('--trust_remote_code', type=bool, default=True, help='Whether to trust remote code')
 parser.add_argument('--dtype', type=str, default='float16', help='Data type to use for the model')
 parser.add_argument('--device', type=str, default='cuda', help='Device to use for the model')
+parser.add_argument('--embedding_model_path', type=str, default='None', help='Path to the embedding model')
 args = parser.parse_args()
 
 if args.dtype == 'float16':
@@ -119,6 +120,22 @@ async def generate(body: dict = Body(...,example={
 
     # 返回结果
     return parsed_answer
+
+#support for embedding models
+if args.embedding_model_path:
+    from sentence_transformers import SentenceTransformer
+    model_emb = SentenceTransformer(args.embedding_model_path).to(args.device)
+    @app.post("/embed/")
+    async def embed(body: dict = Body(...,example={"text": "Hello, world!"})):
+        """
+        Use the sentence-transformers model to embed text
+        """
+        text = body.get("text", None)
+        #inputs = processor(text=text, return_tensors="pt").to(args.device,torch_dtype)
+        inputs = text
+        with torch.no_grad():
+            embeddings = model_emb.encode(inputs)
+        return embeddings.tolist()
 
 
 import uvicorn
