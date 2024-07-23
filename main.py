@@ -21,7 +21,7 @@ parser.add_argument('--model_path', type=str, default='microsoft/Florence-2-larg
 parser.add_argument('--trust_remote_code', type=bool, default=True, help='Whether to trust remote code')
 parser.add_argument('--dtype', type=str, default='float16', help='Data type to use for the model')
 parser.add_argument('--device', type=str, default='cuda', help='Device to use for the model')
-parser.add_argument('--embedding_model_path', type=str, default='None', help='Path to the embedding model')
+parser.add_argument('--embedding_model_path', type=str, default=None, help='Path to the embedding model')
 args = parser.parse_args()
 
 if args.dtype == 'float16':
