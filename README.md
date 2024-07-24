@@ -1,4 +1,5 @@
-llm_toolkit_api: A API for Enhancing Large Language Models
+*llm_toolkit_api: A API for Enhancing Large Language Models*
+
 This repository provides a  API designed to extend the capabilities of large language models (LLMs) like vision models. It offers functionalities such as image captioning and text embedding. The API is built using FastAPI and is designed to be easily deployable and customizable.
 
 Key Features:
@@ -43,13 +44,13 @@ The API exposes two endpoints:
      "file_or_url": "https://example.com/image.jpg"
    }
 
-Copy
+
 /embed/ (POST):
    {
      "text": "Hello, world!"
    }
 
-Copy
+
 Note:
 
 The /embed/ endpoint requires you to provide an embedding model path when running the API.
