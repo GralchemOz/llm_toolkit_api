@@ -22,6 +22,7 @@ parser.add_argument('--trust_remote_code', type=bool, default=True, help='Whethe
 parser.add_argument('--dtype', type=str, default='float16', help='Data type to use for the model')
 parser.add_argument('--device', type=str, default='cuda', help='Device to use for the model')
 parser.add_argument('--embedding_model_path', type=str, default=None, help='Path to the embedding model')
+parser.add_argument('--fetch', type=bool, default=False, help='Whether to fetch a web page')
 args = parser.parse_args()
 
 if args.dtype == 'float16':
@@ -136,6 +137,26 @@ if args.embedding_model_path:
         with torch.no_grad():
             embeddings = model_emb.encode(inputs)
         return embeddings.tolist()
+
+#support for fetch and parse a web page
+if args.fetch:
+    from bs4 import BeautifulSoup
+    import json
+    import asyncio
+
+    @app.post("/fetch/")
+    async def fetch_and_parse(body: dict = Body(...,example={"url": "https://example.com"})):
+        """Fetch and parse a web page."""
+        url = body.get("url", None)
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url)
+            soup = BeautifulSoup(response.text, 'html.parser')
+            data = {
+                'title': soup.find('title').text,
+                'paragraphs': [p.text for p in soup.find_all('p')],
+            }
+            return data
+        
 
 
 import uvicorn
