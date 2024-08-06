@@ -17,7 +17,7 @@ parser.add_argument('--port', type=int, default=8000, help='Port to run the serv
 parser.add_argument('--host', type=str, default='127.0.0.1', help='Host to run the server on')
 #model args
 #parser.add_argument('--model_name', type=str, default='Florence-2-large-ft', help='Name of the model to use')
-parser.add_argument('--model_path', type=str, default=None, help='Path to the model')
+parser.add_argument('--model_path', type=str, default=None, help='Path to the florence-2 model')
 parser.add_argument('--trust_remote_code', type=bool, default=True, help='Whether to trust remote code')
 parser.add_argument('--dtype', type=str, default='float16', help='Data type to use for the model')
 parser.add_argument('--device', type=str, default='cuda', help='Device to use for the model')
