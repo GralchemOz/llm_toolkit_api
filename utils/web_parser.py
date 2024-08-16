@@ -525,15 +525,7 @@ if __name__ == "__main__":
     chrome_options.add_argument("--no-sandbox")  # 在某些环境中需要
     chrome_options.add_argument("--disable-dev-shm-usage")  # 在某些环境中需要
     driver = webdriver.Chrome(options=chrome_options)
-    #driver.get("https://www.example.com")
-    #file_path = 'D:/ProgramData/AIChat/web_parser/test.html'
-    #driver.get(f"file:///{file_path}")
-    #driver.get("https://github.com/comfyanonymous/ComfyUI/releases/tag/v0.0.5")
-    #driver.get("https://github.com/koishijs/koishi")
-    #driver.get("https://k.sina.com.cn/article_3214158792_bf942bc801901jom0.html?from=news&subch=onews")
-    driver.get("https://mzh.moegirl.org.cn/%E6%9D%9C%E9%87%8E%E5%87%9B%E4%B8%96")
-    #driver.get("https://cloud.tencent.com/developer/article/2362786")
-    #driver.get("https://github.com/turboderp/exllamav2")
+    driver.get("https://www.example.com")
     # Wait for the page to load
     wait = WebDriverWait(driver, 10)
     wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
