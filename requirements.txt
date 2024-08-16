@@ -9,3 +9,4 @@ timm==0.9.16
 sentence_transformers == 2.2.2
 beautifulsoup4
 uvicorn==0.30.3
+selenium==4.23.1

@@ -36,7 +36,7 @@ else:
 # 初始化FastAPI应用
 app = FastAPI(    title="llm_toolkit_api",
     description="A simple API for extra functionality for large language models",
-    version="0.2.0")
+    version="0.3.0")
 # 初始化模型和处理器
 if args.model_path:
     try:
@@ -141,24 +141,68 @@ if args.embedding_model_path:
 
 #support for fetch and parse a web page
 if args.fetch:
+    if not args.embedding_model_path:
+        raise Exception("embedding_model_path is required for fetch and parse")
+    import httpx
     from bs4 import BeautifulSoup
     import json
     import asyncio
+    from utils.web_parser import *
+    from utils.embedding_content import *
+    import time
+    from selenium.webdriver.chrome.options import Options
 
-    @app.post("/fetch/")
-    async def fetch_and_parse(body: dict = Body(...,example={"url": "https://example.com"})):
-        """Fetch and parse a web page."""
-        url = body.get("url", None)
+    async def fetch_and_process(url: str):
+        chrome_options = Options()
+        chrome_options.add_argument("--headless")  # 无头模式下运行
+        chrome_options.add_argument("--disable-gpu")  # 禁用GPU加速，某些系统/配置需要
+        chrome_options.add_argument("--ignore-ssl-errors")  
+        chrome_options.add_argument("--no-sandbox")  # 在某些环境中需要
+        chrome_options.add_argument("--disable-dev-shm-usage")  # 在某些环境中需要
+        driver = webdriver.Chrome(options=chrome_options)
         async with httpx.AsyncClient() as client:
-            response = await client.get(url)
-            soup = BeautifulSoup(response.text, 'html.parser')
-            data = {
-                'title': soup.find('title').text,
-                'paragraphs': [p.text for p in soup.find_all('p')],
-            }
-            return data
-        
+            driver.get(url)
+            wait = WebDriverWait(driver, 10)
+            wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
+            raw_html = driver.page_source
+            soup = BeautifulSoup(raw_html, 'html.parser')
+            window_rect = driver.get_window_rect()
+            readableNodes = get_all_readable_nodes(driver, timeout_seconds=10)
+            print(f"number of readable nodes: {len(readableNodes)}")
+            clusters, noise = cluster_readable_nodes(readableNodes)
+            critical_clusters = find_critical_clusters(window_rect, readableNodes, clusters)
 
+            cluster_membership = {}
+            for cluster in critical_clusters:
+                for index in cluster:
+                    cluster_membership[index] = True
+            filtered_nodes = [node for i, node in enumerate(readableNodes) if i in cluster_membership]
+
+            # 输出节点数量
+            print(f"number of readable nodes: {len(filtered_nodes)}")
+            elements = [serialize_node(node["node"]) for node in filtered_nodes]
+            metadata = get_page_metadata(soup)
+            data = {**metadata, "elements": elements}
+            return data
+
+    @app.post("/fetch/raw/")
+    async def fetch_and_parse(body: dict = Body(..., example={"url": "https://example.com"})):
+        """Fetch and parse a web page with raw format."""
+        url = body.get("url", None)
+        return await fetch_and_process(url)
+
+    @app.post("/fetch/embed/")
+    async def fetch_and_emb(body: dict = Body(..., example={"url": "https://example.com"})):
+        """Fetch and parse a web page with split and embedding."""
+        url = body.get("url", None)
+        data = await fetch_and_process(url)
+        # 读取JSON文件中的文本内容
+        contents = read_json_file(data)
+        # 过滤重复文本
+        unique_contents = list(set(contents))  # 使用集合去重
+        # 处理文本并获取embedding
+        embeddings = process_texts_for_embedding(unique_contents, model_emb, segment_length=256)
+        return embeddings
 
 import uvicorn
 

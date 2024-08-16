@@ -2,6 +2,10 @@
 
 This repository provides a  API designed to extend the capabilities of large language models (LLMs) like vision models. It offers functionalities such as image captioning and text embedding. The API is built using FastAPI and is designed to be easily deployable and customizable.
 
+New Features:
+
+Website parser: The API now includes a website parser that can extract text from a given URL. This feature is useful for generating text embeddings from web content.
+
 Key Features:
 
 Image Captioning: Leverages the power of Florence-2 to generate captions for images. You can provide either a base64 or a URL to an image. Other abaliables such as optical character recognition (OCR) of Florence-2 are also supported.
