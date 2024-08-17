@@ -23,6 +23,7 @@ parser.add_argument('--dtype', type=str, default='float16', help='Data type to u
 parser.add_argument('--device', type=str, default='cuda', help='Device to use for the model')
 parser.add_argument('--embedding_model_path', type=str, default=None, help='Path to the embedding model')
 parser.add_argument('--fetch', type=bool, default=False, help='Whether to fetch a web page')
+parser.add_argument('--guard_model_path', type=str, default=None, help='Whether to start the guard model')
 args = parser.parse_args()
 
 if args.dtype == 'float16':
@@ -139,6 +140,22 @@ if args.embedding_model_path:
             embeddings = model_emb.encode(inputs)
         return embeddings.tolist()
 
+#support for guard model
+if args.guard_model_path:
+    from transformers import pipeline
+    classifier = pipeline("text-classification", model=args.guard_model_path,device=args.device)
+    @app.post("/guard/")
+    async def guard(body: dict = Body(...,example={"text": "Hello, world!"})):
+        """
+        Use the guard model to classify text
+        """
+        text = body.get("text", None)
+        #inputs = processor(text=text, return_tensors="pt").to(args.device,torch_dtype)
+        inputs = text
+        with torch.no_grad():
+            result = classifier(inputs)
+        return result
+
 #support for fetch and parse a web page
 if args.fetch:
     if not args.embedding_model_path:
@@ -159,6 +176,7 @@ if args.fetch:
         chrome_options.add_argument("--ignore-ssl-errors")  
         chrome_options.add_argument("--no-sandbox")  # 在某些环境中需要
         chrome_options.add_argument("--disable-dev-shm-usage")  # 在某些环境中需要
+        #chrome_options.add_argument(f"--proxy-server=http://192.168.1.100:8080")  # 设置代理服务器
         driver = webdriver.Chrome(options=chrome_options)
         async with httpx.AsyncClient() as client:
             driver.get(url)

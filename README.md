@@ -4,7 +4,8 @@ This repository provides a  API designed to extend the capabilities of large lan
 
 New Features:
 
-Website parser: The API now includes a website parser that can extract text from a given URL. This feature is useful for generating text embeddings from web content.
+* Prompt Guardmodel support: The API now includes support for Prompt Guard (https://huggingface.co/meta-llama/Prompt-Guard-86M), accept a prompt and judge whether it is malicious or not.
+* Website parser: The API now includes a website parser that can extract text from a given URL. This feature is useful for generating text embeddings from web content.
 
 Key Features:
 
