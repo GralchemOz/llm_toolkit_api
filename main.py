@@ -45,11 +45,12 @@ if args.model_path:
         model = AutoModelForCausalLM.from_pretrained(args.model_path, torch_dtype=torch_dtype ,trust_remote_code=args.trust_remote_code).to(args.device)
     except ImportError:
         # A quick fix for the issue with flash_attn from https://huggingface.co/microsoft/phi-1_5/discussions/72
-        def fixed_get_imports(filename: str | os.PathLike) -> list[str]:
-            if not str(filename).endswith("/modeling_florence2.py"):
-                return get_imports(filename)
+        def fixed_get_imports(filename):
+            #if not str(filename).endswith("/modeling_florence2.py"):
+            #    return get_imports(filename)
             imports = get_imports(filename)
-            imports.remove("flash_attn")
+            if "flash_attn" in imports:
+                imports.remove("flash_attn")
             return imports
     
         with patch("transformers.dynamic_module_utils.get_imports", fixed_get_imports):
