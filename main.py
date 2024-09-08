@@ -10,6 +10,7 @@ import argparse
 from unittest.mock import patch
 from transformers.dynamic_module_utils import get_imports
 import os
+import time
 
 # 解析命令行参数
 parser = argparse.ArgumentParser()
@@ -18,12 +19,14 @@ parser.add_argument('--host', type=str, default='127.0.0.1', help='Host to run t
 #model args
 #parser.add_argument('--model_name', type=str, default='Florence-2-large-ft', help='Name of the model to use')
 parser.add_argument('--model_path', type=str, default=None, help='Path to the florence-2 model')
-parser.add_argument('--trust_remote_code', type=bool, default=True, help='Whether to trust remote code')
+parser.add_argument('--trust_remote_code', type=bool, default=False, help='Whether to trust remote code')
 parser.add_argument('--dtype', type=str, default='float16', help='Data type to use for the model')
 parser.add_argument('--device', type=str, default='cuda', help='Device to use for the model')
 parser.add_argument('--embedding_model_path', type=str, default=None, help='Path to the embedding model')
 parser.add_argument('--fetch', type=bool, default=False, help='Whether to fetch a web page')
 parser.add_argument('--guard_model_path', type=str, default=None, help='Whether to start the guard model')
+parser.add_argument('--verbose', type=bool, default=False, help='Verbose mode')
+
 args = parser.parse_args()
 
 if args.dtype == 'float16':
@@ -37,7 +40,7 @@ else:
 # 初始化FastAPI应用
 app = FastAPI(    title="llm_toolkit_api",
     description="A simple API for extra functionality for large language models",
-    version="0.3.0")
+    version="0.3.1")
 # 初始化模型和处理器
 if args.model_path:
     try:
@@ -128,17 +131,28 @@ if args.model_path:
 #support for embedding models
 if args.embedding_model_path:
     from sentence_transformers import SentenceTransformer
-    model_emb = SentenceTransformer(args.embedding_model_path).to(args.device)
+    #from asgiref.sync import sync_to_async
+    model_emb = SentenceTransformer(args.embedding_model_path,trust_remote_code=args.trust_remote_code,model_kwargs={"torch_dtype":torch_dtype}).to(args.device)
+    #async def encode2list(encode):
+    #    return encode
     @app.post("/embed/")
     async def embed(body: dict = Body(...,example={"text": "Hello, world!"})):
         """
         Use the sentence-transformers model to embed text
         """
+        start_time = time.time()
+
         text = body.get("text", None)
         #inputs = processor(text=text, return_tensors="pt").to(args.device,torch_dtype)
         inputs = text
         with torch.no_grad():
             embeddings = model_emb.encode(inputs)
+        #embeddings = await sync_to_async(model_emb.encode)(inputs)
+        #embeddings = await encode2list(embeddings)        
+        elapsed_time = time.time() - start_time
+        if args.verbose:
+            print(f"Embedding context: {inputs}")
+            print(f"Embedding time: {elapsed_time:.4f} seconds")
         return embeddings.tolist()
 
 #support for guard model
