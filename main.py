@@ -132,7 +132,11 @@ if args.model_path:
 if args.embedding_model_path:
     from sentence_transformers import SentenceTransformer
     #from asgiref.sync import sync_to_async
-    model_emb = SentenceTransformer(args.embedding_model_path,trust_remote_code=args.trust_remote_code,model_kwargs={"torch_dtype":torch_dtype,"attn_implementation":"sdpa"}).to(args.device)
+    try:
+        model_emb = SentenceTransformer(args.embedding_model_path,trust_remote_code=args.trust_remote_code,model_kwargs={"torch_dtype":torch_dtype,"attn_implementation":"sdpa"}).to(args.device)
+    except:
+        print("Loading embedding model failed, trust_remote_code setting doesn't work, try to set it to False\n")
+        model_emb = SentenceTransformer(args.embedding_model_path,model_kwargs={"torch_dtype":torch_dtype,"attn_implementation":"sdpa"}).to(args.device)
     #async def encode2list(encode):
     #    return encode
     @app.post("/embed/")
