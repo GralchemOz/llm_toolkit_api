@@ -26,6 +26,7 @@ parser.add_argument('--embedding_model_path', type=str, default=None, help='Path
 parser.add_argument('--fetch', type=bool, default=False, help='Whether to fetch a web page')
 parser.add_argument('--guard_model_path', type=str, default=None, help='Whether to start the guard model')
 parser.add_argument('--verbose', type=bool, default=False, help='Verbose mode')
+parser.add_argument('--html2markdown_model_path', type=str, default=None, help='Path to the html2markdown model')
 
 args = parser.parse_args()
 
@@ -158,6 +159,43 @@ if args.embedding_model_path:
             print(f"Embedding context: {inputs}")
             print(f"Embedding time: {elapsed_time:.4f} seconds")
         return embeddings.tolist()
+
+#support for HTML2markdown model
+if args.html2markdown_model_path:
+    from transformers import AutoTokenizer
+    tokenizer = AutoTokenizer.from_pretrained(args.html2markdown_model_path)
+    model_html2markdown = AutoModelForCausalLM.from_pretrained(args.html2markdown_model_path,torch_dtype=torch_dtype).to(args.device)
+    @app.post("/html2markdown/")
+    async def html2markdown(body: dict = Body(...,example={"html_or_url": "https://www.example.com"})):
+        """
+        Use the HTML2markdown model to convert HTML to markdown
+        """
+        start_time = time.time()
+        #judge if the input is a url or html
+        html_or_url = body.get("html_or_url", None)
+
+        if html_or_url.startswith("http") or html_or_url.startswith("www"):
+            async with httpx.AsyncClient() as client:
+                response = await client.get(html_or_url,follow_redirects=True)
+                html_content = response.content.decode("utf-8")
+        else:
+            html_content = html_or_url
+        messages = [{"role": "user", "content": html_content}]
+        input_text=tokenizer.apply_chat_template(messages, tokenize=False)
+        inputs = tokenizer.encode(input_text, return_tensors="pt").to(args.device)
+        outputs = model_html2markdown.generate(inputs, max_new_tokens=128, temperature=0, do_sample=False, repetition_penalty=1.2)
+        generated_ids = [output_ids[len(input_ids):] for input_ids, output_ids in zip(inputs, outputs)]
+        #release vram
+        del inputs
+        torch.cuda.empty_cache()
+        if args.verbose:
+            print(f"HTML2markdown context: {html_content}")
+            print(f"HTML2markdown time: {time.time() - start_time:.4f} seconds")
+        raw_text = tokenizer.decode(generated_ids[0],skip_special_tokens=True)
+        #strip assistant 
+        raw_text = raw_text.split("assistant")[1].strip()
+        return raw_text
+
 
 #support for guard model
 if args.guard_model_path:
