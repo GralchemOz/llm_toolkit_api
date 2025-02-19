@@ -132,6 +132,7 @@ if args.model_path:
 #support for embedding models
 if args.embedding_model_path:
     from sentence_transformers import SentenceTransformer
+    from asgiref.sync import sync_to_async
     #from asgiref.sync import sync_to_async
     try:
         model_emb = SentenceTransformer(args.embedding_model_path,trust_remote_code=args.trust_remote_code,model_kwargs={"torch_dtype":torch_dtype,"attn_implementation":"sdpa"}).to(args.device)
@@ -140,7 +141,51 @@ if args.embedding_model_path:
         model_emb = SentenceTransformer(args.embedding_model_path,model_kwargs={"torch_dtype":torch_dtype,"attn_implementation":"sdpa"}).to(args.device)
     #async def encode2list(encode):
     #    return encode
+
     @app.post("/embed/")
+    async def embed_new(body: dict = Body(..., example={"input": ["Hello, world!", "你好，世界！"],
+                                                        "model": "BAAI/bge-large-zh-v1.5",
+                                                        "encoding_format": "float"})):
+        """
+        Use the sentence-transformers model to embed text (New Standardized Format)
+        Now supports multiple inputs in a single request.
+        """
+        start_time = time.time()
+
+        input_texts = body.get("input", None)
+        model_name = body.get("model", "BAAI/bge-large-zh-v1.5")  # 提供默认值
+        encoding_format = body.get("encoding_format", "float")  # 提供默认值
+
+        if not isinstance(input_texts, list):
+            input_texts = [input_texts]  # 如果input不是列表，转换为列表
+
+        embeddings_list = []
+        for i, input_text in enumerate(input_texts):
+            embeddings = await sync_to_async(model_emb.encode)(input_text)
+            embeddings_list.append({
+                "object": "embedding",
+                "embedding": embeddings.tolist(),
+                "index": i
+            })
+
+        elapsed_time = time.time() - start_time
+        if args.verbose:
+            print(f"Embedding context: {input_texts}")
+            print(f"Embedding time: {elapsed_time:.4f} seconds")
+
+        # Format the response to match the OpenAI structure
+        response_data = {
+            "model": model_name,
+            "data": embeddings_list,
+            "usage": {
+                "prompt_tokens": 10,  # 占位符
+                "completion_tokens": 10,  # 占位符
+                "total_tokens": 10  # 占位符
+            }
+        }
+        return response_data
+        
+    @app.post("/embed/legacy/")
     async def embed(body: dict = Body(...,example={"text": "Hello, world!"})):
         """
         Use the sentence-transformers model to embed text
