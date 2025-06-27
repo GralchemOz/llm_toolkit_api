@@ -11,6 +11,9 @@ from unittest.mock import patch
 from transformers.dynamic_module_utils import get_imports
 import os
 import time
+import uuid
+from pydantic import BaseModel,Field 
+from typing import List, Optional
 
 # 解析命令行参数
 parser = argparse.ArgumentParser()
@@ -23,6 +26,7 @@ parser.add_argument('--trust_remote_code', type=bool, default=False, help='Wheth
 parser.add_argument('--dtype', type=str, default='float16', help='Data type to use for the model')
 parser.add_argument('--device', type=str, default='cuda', help='Device to use for the model')
 parser.add_argument('--embedding_model_path', type=str, default=None, help='Path to the embedding model')
+parser.add_argument('--reranker_model_path',type=str, default=None, help='Path to the reranker model')
 parser.add_argument('--fetch', type=bool, default=False, help='Whether to fetch a web page')
 parser.add_argument('--guard_model_path', type=str, default=None, help='Whether to start the guard model')
 parser.add_argument('--verbose', type=bool, default=False, help='Verbose mode')
@@ -41,7 +45,7 @@ else:
 # 初始化FastAPI应用
 app = FastAPI(    title="llm_toolkit_api",
     description="A simple API for extra functionality for large language models",
-    version="0.3.1")
+    version="1.1.0")
 # 初始化模型和处理器
 if args.model_path:
     try:
@@ -205,6 +209,138 @@ if args.embedding_model_path:
             print(f"Embedding time: {elapsed_time:.4f} seconds")
         return embeddings.tolist()
 
+#support for reranker model
+if args.reranker_model_path:
+    from transformers import AutoModel, AutoTokenizer, AutoModelForCausalLM
+    def format_instruction(instruction, query, doc):
+        if instruction is None:
+            instruction = 'Given a web search query, retrieve relevant passages that answer the query'
+        output = "<Instruct>: {instruction}\n<Query>: {query}\n<Document>: {doc}".format(instruction=instruction,query=query, doc=doc)
+        return output
+
+    def process_inputs(pairs):
+        inputs = tokenizer(
+            pairs, padding=False, truncation='longest_first',
+            return_attention_mask=False, max_length=max_length - len(prefix_tokens) - len(suffix_tokens)
+        )
+        for i, ele in enumerate(inputs['input_ids']):
+            inputs['input_ids'][i] = prefix_tokens + ele + suffix_tokens
+        inputs = tokenizer.pad(inputs, padding=True, return_tensors="pt", max_length=max_length)
+        for key in inputs:
+            inputs[key] = inputs[key].to(model.device)
+        return inputs
+
+
+    def compute_logits(inputs, **kwargs):
+        batch_scores = model(**inputs).logits[:, -1, :]
+        true_vector = batch_scores[:, token_true_id]
+        false_vector = batch_scores[:, token_false_id]
+        batch_scores = torch.stack([false_vector, true_vector], dim=1)
+        batch_scores = torch.nn.functional.log_softmax(batch_scores, dim=1)
+        scores = batch_scores[:, 1].exp().tolist()
+        return scores
+    
+    tokenizer = AutoTokenizer.from_pretrained(args.reranker_model_path, padding_side='left')
+    model = AutoModelForCausalLM.from_pretrained(args.reranker_model_path,torch_dtype=torch.float16).eval().to(args.device)
+    # We recommend enabling flash_attention_2 for better acceleration and memory saving.
+    # model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen3-Reranker-0.6B", torch_dtype=torch.float16, attn_implementation="flash_attention_2").cuda().eval()
+    token_false_id = tokenizer.convert_tokens_to_ids("no")
+    token_true_id = tokenizer.convert_tokens_to_ids("yes")
+    max_length = 8192
+
+    prefix = "<|im_start|>system\nJudge whether the Document meets the requirements based on the Query and the Instruct provided. Note that the answer can only be \"yes\" or \"no\".<|im_end|>\n<|im_start|>user\n"
+    suffix = "<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
+    prefix_tokens = tokenizer.encode(prefix, add_special_tokens=False)
+    suffix_tokens = tokenizer.encode(suffix, add_special_tokens=False)
+
+    task = 'Given a web search query, retrieve relevant passages that answer the query'
+    @app.post("/reranker/singletest/")
+    async def reranker(body: dict = Body(...,example={"query": "What is the capital of France?", "doc": "The capital of France is Paris."})):
+        """
+        Use the reranker model to get the score of the document
+        """
+        start_time = time.time()
+        query = body.get("query", None)
+        doc = body.get("doc", None)
+        inputs = process_inputs([format_instruction(task, query, doc)])
+        scores = compute_logits(inputs)
+        elasped_time = time.time() - start_time
+        if args.verbose:
+            print(f"Reranker query: {query}")
+            print(f"Reranker doc: {doc}")
+            print(f"Reranker time: {elasped_time:.4f} seconds")
+        return scores[0]
+    
+    class RerankRequest(BaseModel):
+        """
+        comptaible with standred API
+        """
+        model: str = Field("Qwen-3-Reranker-0.6B", description="Not used")
+        query: str = Field("What is the capital of France?", description="The query to search for")
+        documents: List[str] = Field([
+                        "The capital of France is Paris.",
+                        "Paris is the capital of France.",
+                        "The capital of France is Lyon.",
+                        "Lyon is the capital of France.",
+                        "The capital of France is Marseille.",
+                    ], description="The documents to search for")
+        top_n: int = Field(10, description="The number of documents to return")
+        return_documents: bool = Field(True, description="Whether to return the documents")
+
+    
+    class RerankResult(BaseModel):
+        """
+        comptaible with standred API
+        """
+        index: int = Field(..., description="The original index of the document")
+        relevance_score: float = Field(..., description="The relevance score of the document")
+        document: Optional[str] = Field(None, description="The document")
+
+    class RerankResponse(BaseModel):
+        """
+        comptaible with standred API
+        """
+        id: str = Field(default_factory=lambda: f"rerank-{uuid.uuid4()}", description="The id of the document")
+        object: str = Field(default="rerank", description="The object of the response")
+        crated: int = Field(default=int(time.time()), description="The time the document was created")
+        model: str = Field(..., description="The model used to generate the response")
+        results: List[RerankResult] = Field(..., description="The results of the rerank")
+
+    @app.post("/rerank", response_model=RerankResponse)
+    async def rerank_endpoint(request: RerankRequest):
+        """
+        get request and return response
+        """
+        start_time = time.time()
+        pairs = [format_instruction(task, query, doc) for query, doc in [[request.query, doc] for doc in request.documents]]
+        inputs = process_inputs(pairs)
+        scores = compute_logits(inputs)
+        elasped_time = time.time() - start_time
+        results_with_scores = list(zip(range(len(request.documents)),scores,request.documents))
+        results_with_scores.sort(key=lambda x: x[1], reverse=True)
+
+        if request.top_n is not None and request.top_n > 0:
+            top_results = results_with_scores[:request.top_n]
+        else:
+            top_results = results_with_scores
+
+        #formalize results    
+        response_results: List[RerankResult] = []
+        for index, score, doc in top_results:
+            result_item = RerankResult(
+                index=index,
+                relevance_score=float(score)
+            )
+            if request.return_documents:
+                result_item.document = doc
+            response_results.append(result_item)
+        if args.verbose:
+            print(f"Reranker: {request.model}")
+            print(f"query: {request.query}")
+            print(f"results: {top_results}")
+            print(f"time: {time.time() - start_time}s")
+        return RerankResponse(model = request.model,results=response_results)
+
 #support for HTML2markdown model
 if args.html2markdown_model_path:
     from transformers import AutoTokenizer
@@ -240,6 +376,7 @@ if args.html2markdown_model_path:
         #strip assistant 
         raw_text = raw_text.split("assistant")[1].strip()
         return raw_text
+        
 
 
 #support for guard model

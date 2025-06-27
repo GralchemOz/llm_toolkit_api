@@ -4,6 +4,7 @@ This repository provides a  API designed to extend the capabilities of large lan
 
 New Features:
 
+* Qwen-3-Reranker support: The API now includes support for Qwen-3-Reranker (https://huggingface.co/collections/Qwen/qwen3-reranker-6841b22d0192d7ade9cdefea), accept a query and a list of documents and return the relevance score for each document.
 * Prompt Guardmodel support: The API now includes support for Prompt Guard (https://huggingface.co/meta-llama/Prompt-Guard-86M), accept a prompt and judge whether it is malicious or not.
 * Website parser: The API now includes a website parser that can extract text from a given URL. This feature is useful for generating text embeddings from web content.
 
